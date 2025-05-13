@@ -1,4 +1,3 @@
-
 # Reto 2: Despliegue de recursos a través de CloudFormation
 
 
@@ -91,461 +90,479 @@ semillero-danirend-miprimerbucket
 A continuación, se presenta una guía para implementar la solución utilizando CloudFormation.
 
 > 💡 Si tienes conocimientos previos en AWS y quieres hacerlo por tu cuenta ¡Adelante! Acá tendrás igualmente la guía si tienes alguna duda.
-
 ## Paso 1: Creación y estructura del template CloudFormation
 
+Para comenzar, necesitarás crear un archivo YAML que contendrá toda la definición de tu infraestructura. Este archivo tendrá las siguientes secciones fundamentales:
 
-Para comenzar, necesitarás crear un archivo YAML que contendrá toda la definición de tu infraestructura. Este archivo tendrá varias secciones fundamentales:
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sistema de Reservas para Hotel - Infraestructura AWS'
 
+Parameters:
+  # Aquí definirás parámetros para personalizar el despliegue
 
-1. AWSTemplateFormatVersion: Versión del formato de plantilla 
-2. Description: Descripción sobre lo que hace el template 
-3. Parameters: Parámetros que se pueden personalizar al implementar la plantilla 
-4. Resources: Recursos de AWS que se crearán 
-5. Outputs: Valores de salida que se mostrarán después de crear los recursos
+Resources:
+  # Aquí definirás todos los recursos AWS que se crearán
 
-
-Estructura básica del template:
-
-
-```yaml 
-AWSTemplateFormatVersion: 
-2010-09-09
- 
-Description: 
-Sistema de Reservas de Hotel para Semillero AWS Ciber
-
-
-
-Parameters: 
-Usuario: 
-Type: String 
-Description: Tu nombre de usuario para la nomenclatura de recursos
-
-
-Resources: 
-# Aquí irán los recursos de AWS
-
-
-Outputs: 
-# Aquí irán los valores de salida 
+Outputs:
+  # Aquí definirás información que quieres mostrar después del despliegue
 ```
 
+### Sección Parameters
 
-Recursos de ayuda: 
-- [Documentación oficial de CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-reference.html)
-- [Anatomía de una plantilla CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html)
+Utiliza estos parámetros ya definidos para tu template:
 
+```yaml
+Parameters:
+  UserName:
+    Type: String
+    Description: 'Nombre de usuario para prefijo de recursos'
+    Default: 'usuario'
+  # Ya que utilizaremos una VPC existente, definimos parámetros para los recursos de red
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: 'ID de la VPC existente donde se desplegarán los recursos'
+    Default: 'vpc-052071eb751480a6b'  # ID de la VPC del semillero
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: 'ID de la subnet pública existente para la instancia EC2'
+    Default: 'subnet-0ffc2bc5959b5a2ab'  # ID de la subnet pública del semillero
+  PrivateSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: 'ID de la subnet privada existente para la función Lambda'
+    Default: 'subnet-0b2ac96840c048166'  # ID de la subnet privada del semillero
+```
+
+> 💡 Nota importante: En este reto, NO crearemos una nueva VPC ni subnets. Utilizaremos la infraestructura de red ya existente en la cuenta del semillero para evitar alcanzar los límites de la cuenta. Los IDs ya están incluidos como valores predeterminados.
 
 ## Paso 2: Definición de recursos en CloudFormation
 
-A continuación, deberás definir cada uno de los recursos necesarios para la arquitectura. Para cada recurso, te proveemos el tipo de recurso de CloudFormation y un enlace a la documentación de referencia.
+A continuación, deberás definir los recursos necesarios para la arquitectura. Para cada recurso te proporcionamos el nombre lógico (Logical ID) y el tipo de recurso que debes usar, pero tendrás que investigar las propiedades necesarias.
 
 ### 2.1 Bucket S3
 
-
-```yaml 
-HotelBucket: 
-  Type: AWS::S3::Bucket 
+```yaml
+# S3 Bucket para archivos estáticos y documentos 
+HotelReservationsBucket: 
+  Type: 'AWS::S3::Bucket' 
   Properties: 
-    BucketName: !Sub "semillero-${Usuario}-hotel-reservations" 
-    # Aquí definir las demás propiedades 
+    BucketName: !Sub "semillero-${UserName}-hotel-reservations" 
+    # Aquí definir las demás propiedades del Bucket S3 
 ```
-
 
 Documentación: [AWS::S3::Bucket](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html)
 
+### 2.2 Política de Bucket S3
 
-### 2.2 Tabla DynamoDB
-
-
-```yaml 
-ReservationsTable: 
-  Type: AWS::DynamoDB::Table 
+```yaml
+# Política de bucket para hacer públicos los archivos estáticos 
+HotelReservationsBucketPolicy: 
+  Type: 'AWS::S3::BucketPolicy' 
   Properties: 
-    TableName: !Sub "semillero-${Usuario}-HotelReservations" 
-    # Especificar clave primaria, capacidad, etc. 
+    Bucket: !Ref HotelReservationsBucket 
+    # Aquí definir las demás propiedades 
 ```
 
+Documentación: [AWS::S3::BucketPolicy](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-policy.html)
+
+### 2.3 Tabla DynamoDB
+
+```yaml
+# Tabla DynamoDB para almacenar reservas 
+HotelReservationsTable: 
+  Type: 'AWS::DynamoDB::Table' 
+  Properties: 
+    TableName: !Sub "semillero-${UserName}-HotelReservations" 
+    # Aquí definir las demás propiedades 
+```
 
 Documentación: [AWS::DynamoDB::Table](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html)
 
+### 2.4 Tema SNS
 
-### 2.3 Tema SNS
-
-
-```yaml 
-ReservationConflictTopic: 
-  Type: AWS::SNS::Topic 
+```yaml
+# Tema SNS para notificaciones de conflictos 
+ReservationConflictsTopic: 
+  Type: 'AWS::SNS::Topic' 
   Properties: 
-    TopicName: !Sub "semillero-${Usuario}-HotelReservationConflicts" 
-    # Otras propiedades 
+    TopicName:  !Sub "semillero-${UserName}-HotelReservationsConflicts" 
+    DisplayName: 'Conflictos de Reservas de Hotel' 
 ```
-
 
 Documentación: [AWS::SNS::Topic](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-topic.html)
 
+### 2.5 Suscripción SNS
 
-### 2.4 Suscripción SNS
-
-
-```yaml 
-EmailSubscription: 
-  Type: AWS::SNS::Subscription 
+```yaml
+# Suscripción al tema SNS para el administrador 
+AdminSubscription: 
+  Type: 'AWS::SNS::Subscription' 
   Properties: 
+    TopicArn: !Ref ReservationConflictsTopic 
     Protocol: email 
-    Endpoint: tu-email@ejemplo.com 
-    TopicArn: !Ref ReservationConflictTopic 
+    Endpoint: !Sub "${UserName}@bancolombia.com.co" 
 ```
-
 
 Documentación: [AWS::SNS::Subscription](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html)
 
+### 2.6 Rol de ejecución para Lambda
 
-### 2.5 VPC y Networking
-
-
-```yaml 
-HotelVPC: 
-Type: AWS::EC2::VPC 
-Properties: 
-CidrBlock: 10.0.0.0/16 
-# Otras propiedades
-
-
-PublicSubnet: 
-Type: AWS::EC2::Subnet 
-Properties: 
-VpcId: !Ref HotelVPC 
-CidrBlock: 10.0.0.0/24 
-# Otras propiedades
-
-
-PrivateSubnet: 
-Type: AWS::EC2::Subnet 
-Properties: 
-VpcId: !Ref HotelVPC 
-CidrBlock: 10.0.1.0/24 
-# Otras propiedades
-
-
-# Definir también: Internet Gateway, Route Tables, NAT Gateway 
+```yaml
+# Rol IAM para la función Lambda 
+LambdaExecutionRole: 
+  Type: 'AWS::IAM::Role' 
+  Properties: 
+    AssumeRolePolicyDocument: 
+      # Aquí va la política de confianza para Lambda 
+    ManagedPolicyArns: 
+      # Aquí van las políticas administradas necesarias 
+    Policies: 
+      # Aquí van las políticas inline necesarias para el rol 
 ```
-
-
-Documentación: 
-- [AWS::EC2::VPC](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html) 
-- [AWS::EC2::Subnet](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html) 
-- [AWS::EC2::InternetGateway](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html)
-- [AWS::EC2::RouteTable](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-routetable.html)
-- [AWS::EC2::NatGateway](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-natgateway.html)
-
-
-### 2.6 IAM Roles
-
-
-```yaml 
-LambdaRole: 
-Type: AWS::IAM::Role 
-Properties: 
-RoleName: !Sub "semillero-${Usuario}-LambdaHotelReservationRole" 
-AssumeRolePolicyDocument: 
-Version: 
-2012-10-17
- 
-Statement: 
-- Effect: Allow 
-Principal: 
-Service: lambda.amazonaws.com 
-Action: 
-sts:AssumeRole
- 
-# Definir ManagedPolicyArns o políticas inline
-
-
-EC2Role: 
-Type: AWS::IAM::Role 
-Properties: 
-RoleName: !Sub "semillero-${Usuario}-EC2HotelReservationRole" 
-# Definir políticas de asunción y permisos 
-```
-
 
 Documentación: [AWS::IAM::Role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html)
 
+### 2.7 Grupo de seguridad para Lambda
 
-### 2.7 Función Lambda
-
-
-```yaml 
-ValidateReservationFunction: 
-  Type: AWS::Lambda::Function 
-  Properties: 
-    FunctionName: !Sub "semillero-${Usuario}-ValidateHotelReservation" 
-    Runtime: python3.13 
-    Handler: lambda_function.lambda_handler 
-    Role: !GetAtt LambdaRole.Arn 
-    Code: 
-      ZipFile: | 
-        # Código de la función lambda_function.py aquí 
-    Environment: 
-      Variables: 
-        SNS_TOPIC_ARN: !Ref ReservationConflictTopic 
-        DYNAMODB_TABLE: !Ref ReservationsTable 
-    # Definir configuración de VPC 
-```
-
-
-Documentación: [AWS::Lambda::Function](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html)
-
-
-### 2.8 Regla de EventBridge
-
-
-```yaml 
-ReservationValidatorRule: 
-  Type: AWS::Events::Rule 
-  Properties: 
-    Name: !Sub "semillero-${Usuario}-HotelReservationValidator" 
-    Description: "Regla para activar la validación de reservas de hotel" 
-    EventPattern: 
-      # Definir el patrón de eventos para DynamoDB 
-    Targets: 
-      - Arn: !GetAtt ValidateReservationFunction.Arn 
-        Id: "ValidateReservationTarget" 
-```
-
-
-Documentación: [AWS::Events::Rule](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-events-rule.html)
-
-
-### 2.9 Grupos de Seguridad
-
-
-```yaml 
-WebServerSecurityGroup: 
-Type: AWS::EC2::SecurityGroup 
-Properties: 
-GroupName: !Sub "semillero-${Usuario}-sg-web-server" 
-GroupDescription: "Grupo de seguridad para el servidor web" 
-VpcId: !Ref HotelVPC 
-SecurityGroupIngress: 
-- IpProtocol: tcp 
-FromPort: 80 
-ToPort: 80 
-CidrIp: 0.0.0.0/0 
-# Definir otras reglas de ingreso
-
-
+```yaml
+# Grupo de seguridad para Lambda 
 LambdaSecurityGroup: 
-Type: AWS::EC2::SecurityGroup 
-Properties: 
-GroupName: !Sub "semillero-${Usuario}-sg-lambda" 
-# Definir otras propiedades 
+  Type: AWS::EC2::SecurityGroup 
+  Properties: 
+    VpcId: !Ref VpcId 
+    # Aquí definir las demás propiedades 
 ```
-
 
 Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html)
 
+### 2.8 Función Lambda
 
-### 2.10 Instancia EC2
-
-
-```yaml 
-HotelWebServer: 
-  Type: AWS::EC2::Instance 
+```yaml
+# Función Lambda para validar reservas 
+ReservationValidatorFunction: 
+  Type: 'AWS::Lambda::Function' 
   Properties: 
-    InstanceType: t2.micro 
-    ImageId: ami-0f3581... # Especificar AMI ID apropiada para Amazon Linux 2023 
-    SubnetId: !Ref PublicSubnet 
+    FunctionName: !Sub "semillero-${UserName}-HotelReservationValidator" 
+    # Aquí definir las demás propiedades 
+    Environment: 
+      Variables: 
+        SNS_TOPIC_ARN: !Ref ReservationConflictsTopic 
+        DYNAMODB_TABLE: !Ref HotelReservationsTable 
+    Code: 
+      ZipFile: | 
+        # Aquí va el código de la función Lambda 
+```
+> 💡 Pista importante: En la propiedad ZipFile debes colocar el código Python de la función Lambda (archivo lambda_function.py). Recuerda configurar correctamente el handler para evitar errores de importación.
+
+Documentación: [AWS::Lambda::Function](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html)
+
+### 2.9 Regla de EventBridge
+
+```yaml
+# Regla de EventBridge para detectar cambios en DynamoDB 
+DynamoDBEventRule: 
+  Type: 'AWS::Events::Rule' 
+  Properties: 
+    Name: !Sub "semillero-${UserName}-HotelReservationsDynamoDBEvents" 
+    # Aquí definir las demás propiedades 
+```
+
+Documentación: [AWS::Events::Rule](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-events-rule.html)
+
+### 2.10 Permiso para EventBridge
+
+```yaml
+# Permiso para que EventBridge invoque la función Lambda 
+LambdaPermissionForEventBridge: 
+  Type: 'AWS::Lambda::Permission' 
+  Properties: 
+    # Aquí definir las demás propiedades 
+```
+
+Documentación: [AWS::Lambda::Permission](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html)
+
+### 2.11 Rol para instancia EC2
+
+```yaml
+# Rol para instancia EC2 
+EC2InstanceRole: 
+  Type: 'AWS::IAM::Role' 
+  Properties: 
+    AssumeRolePolicyDocument: 
+      # Aquí va la política de confianza para EC2 
+    ManagedPolicyArns: 
+      # Aquí van las políticas administradas necesarias 
+```
+
+Documentación: [AWS::IAM::Role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html)
+
+### 2.12 Perfil de instancia para EC2
+
+```yaml
+# Perfil de instancia para EC2 
+EC2InstanceProfile: 
+  Type: 'AWS::IAM::InstanceProfile' 
+  Properties: 
+    Roles: 
+      - !Ref EC2InstanceRole 
+```
+
+Documentación: [AWS::IAM::InstanceProfile](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html)
+
+### 2.13 Grupo de seguridad para EC2
+
+```yaml
+# Grupo de seguridad para EC2 
+WebServerSecurityGroup: 
+  Type: 'AWS::EC2::SecurityGroup' 
+  Properties: 
+    VpcId: !Ref VpcId 
+    # Aquí definir las demás propiedades 
+```
+
+Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html)
+
+### 2.14 Instancia EC2
+
+```yaml
+# Instancia EC2 para el servidor web 
+WebServerInstance: 
+  Type: 'AWS::EC2::Instance' 
+  Properties: 
+    InstanceType: "t2.micro" 
+    ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}' 
+    SubnetId: !Ref PublicSubnetId 
     SecurityGroupIds: 
       - !Ref WebServerSecurityGroup 
     IamInstanceProfile: !Ref EC2InstanceProfile 
+    Tags: 
+      - Key: Name 
+        Value: !Sub "semillero-${UserName}-web-server" 
     UserData: 
       Fn::Base64: !Sub | 
-        #!/bin/bash 
-        # Script de inicialización del servidor 
-    # Otras propiedades 
+        #!/bin/bash  
+        # Actualizar el sistema e instalar dependencias 
+        yum update -y 
+        yum install -y python3 python3-pip git 
+ 
+        # Crear directorio para la aplicación 
+        mkdir -p /opt/hotel-app 
+ 
+        # Clonar el repositorio con la aplicación 
+        cd /opt/hotel-app 
+        git clone https://github.com/danielr9911/semillero-aws-ciber-reto1.git . 
+ 
+        # Instalar dependencias de Python 
+        pip3 install -r requirements.txt 
+ 
+        # Crear directorios necesarios para el almacenamiento local 
+        mkdir -p local_storage/documents 
+ 
+        # Modificar app.py para usar los recursos creados por CloudFormation 
+        sed -i "s/S3_BUCKET_NAME = 'semillero-\[USUARIO\]-hotel-reservations'/S3_BUCKET_NAME = 'semillero-${UserName}-hotel-reservations'/" app.py 
+        sed -i "s/DYNAMODB_TABLE = 'semillero-\[USUARIO\]-HotelReservations'/DYNAMODB_TABLE = 'semillero-${UserName}-HotelReservations'/" app.py 
+ 
+        # Crear un archivo de servicio systemd 
+        cat > /etc/systemd/system/hotel-app.service << 'EOF' 
+        [Unit] 
+        Description=Hotel Reservation Application 
+        After=network.target 
+ 
+        [Service] 
+        User=root 
+        WorkingDirectory=/opt/hotel-app 
+        ExecStart=/usr/bin/python3 app.py 
+        Restart=always 
+ 
+        [Install] 
+        WantedBy=multi-user.target 
+        EOF 
+ 
+        # Habilitar e iniciar el servicio 
+        systemctl daemon-reload 
+        systemctl enable hotel-app 
+        systemctl start hotel-app 
 ```
-
 
 Documentación: [AWS::EC2::Instance](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html)
 
+### 2.15 Outputs
+
+Define las salidas para tener acceso a la información importante de tu stack:
+
+```yaml
+Outputs:  
+  ApplicationURL: 
+    Description: 'URL para acceder a la aplicación web' 
+    Value: !Sub 'http://${WebServerInstance.PublicIp}:5000' 
+   
+  WebServerPublicIP: 
+    Description: 'IP pública del servidor web' 
+    Value: !GetAtt WebServerInstance.PublicIp 
+     
+  DynamoDBTableName: 
+    Description: 'Nombre de la tabla DynamoDB' 
+    Value: !Ref HotelReservationsTable 
+     
+  S3BucketName: 
+    Description: 'Nombre del bucket S3' 
+    Value: !Ref HotelReservationsBucket 
+```
 
 ## Paso 3: Despliegue del template CloudFormation
 
-
 Una vez que hayas creado tu template YAML completo, debes desplegarlo a través de la consola de AWS:
 
+### 3.1 Acceder a CloudFormation
 
-1. Acceder a CloudFormation: 
-- En la barra de búsqueda superior, escribe "CloudFormation" y selecciona el servicio.
+1. Inicia sesión en la consola AWS con las credenciales del semillero 
+2. En la barra de búsqueda superior, escribe "CloudFormation" y selecciona el servicio
 
+### 3.2 Crear un stack
 
-2. Crear un stack: 
-- Haz clic en "Crear stack" > "Con nuevos recursos (estándar)". 
-- Selecciona "Cargar un archivo de plantilla" y sube tu archivo YAML. 
-- Haz clic en "Siguiente".
+1. Haz clic en "Crear stack" > "Con nuevos recursos (estándar)" 
+2. En la sección "Especificar plantilla": 
+- Selecciona "Cargar un archivo de plantilla" 
+- Haz clic en "Elegir archivo" y selecciona tu template YAML 
+- Primera validación: En este punto, CloudFormation realizará una validación sintáctica del template. Si hay errores en la estructura YAML o propiedades inválidas, se mostrará un error. 
+- Si la validación es exitosa, haz clic en "Siguiente"
 
+### 3.3 Especificar detalles del stack
 
-3. Especificar detalles del stack: 
-- Nombre del stack: semillero-[USUARIO]-hotel-system 
-- Parámetros: Ingresa tu nombre de usuario y cualquier otro parámetro definido. 
-- Haz clic en "Siguiente".
+1. Nombre del stack: semillero-[USUARIO]-hotel-system (reemplaza [USUARIO] por tu nombre de usuario) 
+2. Parámetros: 
+- UserName: ingresa tu nombre de usuario para que todos los recursos tengan ese prefijo 
+- Los demás parámetros (VpcId, PublicSubnetId, PrivateSubnetId) puedes dejarlos con los valores predeterminados 
+3. Haz clic en "Siguiente"
 
+### 3.4 Configurar opciones del stack
 
-4. Configurar opciones del stack: 
-- En la sección de etiquetas, puedes añadir: 
+1. En la sección de etiquetas, puedes añadir: 
 - Key: Project, Value: Semillero - Reto 2 
 - Key: Environment, Value: SBX 
 - Key: Owner, Value: [USUARIO] 
-- Haz clic en "Siguiente".
+2. Deja el resto de opciones con sus valores predeterminados 
+3. Haz clic en "Siguiente"
 
+### 3.5 Revisar y crear
 
-5. Revisar: 
-- Revisa todos los detalles del stack. 
-- Marca la casilla de reconocimiento de que CloudFormation podría crear recursos IAM. 
-- Haz clic en "Crear stack".
+1. Revisa todos los detalles del stack y los parámetros configurados 
+2. MUY IMPORTANTE: En la parte inferior, marca la casilla que dice "Acepto que AWS CloudFormation podría crear recursos de IAM con nombres personalizados" 
+3. Haz clic en "Crear stack"
 
+### 3.6 Monitorear el progreso
 
-6. Monitorear el progreso: 
-- Espera a que el estado del stack cambie a "CREATE_COMPLETE". 
-- Si hay errores, revisa la pestaña "Eventos" para identificar el problema.
+1. Segunda validación: Durante la creación del stack, CloudFormation validará recursos individuales y sus dependencias 
+2. La creación del stack puede tardar varios minutos (hasta 10-15 minutos) 
+3. Puedes seguir el progreso en la pestaña "Eventos" 
+4. Si todo va bien, el estado del stack cambiará a "CREATE_COMPLETE" 
+5. Si hay errores, el estado será "CREATE_FAILED" y deberás revisar la pestaña "Eventos" para identificar el problema
 
+## Paso 4: Prueba de la aplicación
 
-## Paso 4: Configuración final y pruebas
+Cuando el stack esté completamente creado:
 
+1. Ve a la pestaña "Salidas" del stack 
+2. Localiza la salida "ApplicationURL" 
+3. Haz clic en el enlace o cópialo a tu navegador 
+4. Deberías ver la interfaz web del sistema de reservas del hotel
 
-Una vez que el stack se haya implementado correctamente:
+## Errores comunes y sus soluciones
 
+### 1. Error: Template format error
 
-1. Acceder a la instancia EC2: 
-- En la consola de EC2, encuentra la instancia creada por CloudFormation. 
-- Conéctate a través de Session Manager como en el Reto 1.
+Problema: Hay un problema con la sintaxis YAML del template.
 
+Posibles causas y soluciones: 
+- Indentación incorrecta: YAML es sensible a la indentación. Usa siempre espacios (no tabulaciones) y mantén una indentación consistente (generalmente 2 o 4 espacios). 
+- Falta de comillas: Si tus valores contienen caracteres especiales, enciérralos en comillas. 
+- Referencias incorrectas: Verifica que todas las referencias (!Ref, !GetAtt) apunten a recursos existentes.
 
-2. Configurar la aplicación: 
-- Sigue los mismos pasos del Reto 1 para clonar el repositorio y configurar la aplicación. 
-- Asegúrate de actualizar las variables específicas en el archivo app.py.
+Herramienta útil: Usa un validador YAML online como YAML Lint para verificar tu archivo antes de subirlo.
 
+### 2. Error: Resource already exists
 
-3. Probar el sistema: 
-- Accede a la aplicación web a través de la IP pública de la instancia EC2. 
-- Realiza pruebas creando reservas y generando conflictos.
-
-
-# Posibles errores y soluciones
-
-
-### 1. Error: Resource already exists
-
-
-Problema: Intento crear un recurso con un nombre que ya existe globalmente (como un bucket S3)
-
-
-Solución: 
-- Cambia el nombre del recurso añadiendo un sufijo numérico único 
-- Si estás reintentando después de un despliegue fallido, asegúrate de eliminar cualquier recurso creado previamente
-
-
-### 2. Error: Template format error
-
-
-Problema: El formato YAML es incorrecto
-
+Problema: Estás intentando crear un recurso con un nombre que ya existe (común con buckets S3 y nombres de roles).
 
 Solución: 
-- Verifica la indentación (espacios) en tu archivo YAML 
-- Usa un validador YAML online para verificar la sintaxis 
-- Asegúrate de que no estés mezclando tabulaciones con espacios
+- Modifica el prefijo o agrega un sufijo al nombre del recurso (por ejemplo, un número aleatorio). 
+- Si estás reintentando un despliegue fallido, elimina primero todos los recursos residuales.
 
+### 3. Error: Not authorized to perform iam:CreateRole
 
-### 3. Error: Parameter value <value> is not valid for parameter <name>
-
-
-Problema: Un parámetro no cumple con las restricciones definidas
-
+Problema: No tienes permisos suficientes para crear roles IAM.
 
 Solución: 
-- Revisa los requisitos específicos para ese parámetro (longitud, formato) 
-- Verifica que estés usando el tipo de valor correcto (string, número, etc.)
+- Asegúrate de marcar la casilla de reconocimiento IAM al crear el stack. 
+- Verifica con el instructor si tu usuario tiene los permisos necesarios.
 
+### 4. Error: Template contains errors: Invalid template resource property
 
-### 4. Error: Circular dependency between resources
-
-
-Problema: Hay una dependencia circular entre los recursos
-
+Problema: Una propiedad configurada incorrectamente en algún recurso.
 
 Solución: 
-- Revisa tus referencias usando !Ref o !GetAtt 
-- Reorganiza la estructura para eliminar la dependencia circular 
-- Usa DependsOn para controlar el orden de creación de recursos
+- Revisa la documentación oficial del recurso específico. 
+- Verifica valores permitidos para propiedades como políticas IAM, configuraciones de seguridad, etc.
 
+### 5. Error con Lambda: Unable to import module 'lambda_function'
 
-### 5. Error: Not authorized to perform iam:CreateRole
-
-
-Problema: Permisos insuficientes para crear roles IAM
-
+Problema: El nombre del handler configurado no coincide con el archivo de código.
 
 Solución: 
-- Asegúrate de tener los permisos adecuados en tu cuenta 
-- Marca la casilla de reconocimiento IAM al crear el stack
+- Asegúrate de que el handler sea index.lambda_handler si estás usando ZipFile. 
+- Verifica que el código Python no tenga errores de sintaxis.
 
+### 6. Error en la aplicación web: La aplicación no responde
 
-### 6. Error: Failed to send notification to topic ARN
-
-
-Problema: La confirmación del tema SNS no se completó
-
+Problema: La instancia EC2 no está configurada correctamente o la aplicación no está ejecutándose.
 
 Solución: 
-- Verifica que la dirección de correo electrónico sea válida 
-- Confirma la suscripción al SNS después de que se cree el stack
+- Conéctate a la instancia mediante Session Manager. 
+- Revisa los logs: systemctl status hotel-app o journalctl -u hotel-app. 
+- Verifica que el script UserData se ejecutó correctamente: cat /var/log/cloud-init-output.log.
 
+## Estrategia para reintentar después de errores
 
-## Estrategia para reintentar después de errores:
+Si tu despliegue falla, sigue estos pasos para resolverlo:
 
+1. Identifica el error exacto revisando la pestaña "Eventos" del stack. 
+2. Elimina el stack fallido: selecciona el stack y haz clic en "Eliminar". 
+3. Asegúrate de que todos los recursos creados se eliminen correctamente. 
+4. Corrige el problema en tu template YAML. 
+5. Crea un nuevo stack con el template corregido.
 
-1. Revisar detenidamente los eventos en CloudFormation para identificar el error exacto 
-2. Eliminar el stack fallido antes de reintentar (Acciones > Eliminar stack) 
-3. Corregir el problema en el template YAML 
-4. Crear un nuevo stack con el template corregido
+## Tras completar el despliegue
+
+Una vez que tu infraestructura esté desplegada y funcionando:
+
+1. Realiza pruebas creando, modificando y eliminando reservas. 
+2. Intenta crear un conflicto (dos reservas para la misma habitación en fechas superpuestas). 
+3. Verifica tu correo para confirmar que recibiste las notificaciones de conflictos. 
+4. ¡Explora y disfruta de tu aplicación desplegada con CloudFormation!
 
 
 # Tareas opcionales adicionales (Puntos extras)
 
+El sistema del Hotel Cloud Suites maneja información sensible de los huéspedes, como datos personales y documentos de identidad. Es crucial proteger estos datos implementando encriptación en reposo.
 
-1. Implementar Parámetros y Mapeos en CloudFormation: 
-- Añade parámetros adicionales que permitan configurar aspectos como el tamaño de la instancia EC2 
-- Usa la sección "Mappings" para definir diferentes configuraciones según la región 
-- Implementa validación de parámetros con restricciones y valores permitidos
+### 1. Configurar encriptación en el bucket S3:
 
+- Habilita la encriptación del lado del servidor (SSE) para el bucket de almacenamiento
+- Utiliza claves administradas por AWS (SSE-S3) o mejor aún, claves administradas por KMS (SSE-KMS)
+- Asegura que todos los objetos nuevos sean automáticamente cifrados
 
-2. Mejorar la seguridad con Nested Stacks: 
-- Divide tu arquitectura en stacks anidados (uno para networking, otro para la aplicación, etc.) 
-- Implementa el principio de privilegio mínimo creando stacks específicos para recursos sensibles 
-- Documenta cómo los stacks anidados mejoran la seguridad y gobernanza
+### 2. Implementar encriptación en la tabla DynamoDB:
 
+- Configura la encriptación en reposo para la tabla de reservaciones
+- Utiliza la configuración con claves administradas por AWS o KMS
 
-3. Implementar una infraestructura Multi-AZ: 
-- Modifica tu template para desplegar recursos en múltiples zonas de disponibilidad 
-- Configura una estrategia de alta disponibilidad para la aplicación 
-- Documenta cómo esta arquitectura mejora la resiliencia ante fallos
+### 3. Documentar la implementación:
 
+- Explica qué tipo de encriptación elegiste y por qué
+- Identifica qué datos sensibles estás protegiendo con estas medidas
+- Describe cómo verificar que la encriptación está funcionando correctamente
 
-4. Integración con AWS Secrets Manager: 
-- Modifica el template para almacenar contraseñas y claves en AWS Secrets Manager 
-- Configura la aplicación para recuperar estos secretos de forma segura 
-- Documenta las mejores prácticas implementadas para gestión de secretos
-
-
-5. Implementar Drift Detection y Stack Policies: 
-- Configura la detección de desviaciones (drift) en tu stack de CloudFormation 
-- Implementa políticas de stack para proteger recursos críticos contra actualizaciones accidentales 
-- Demuestra un caso de uso donde la detección de drift identifica cambios manuales no autorizados
-
+Documentación: [Protección de datos en AWS](https://docs.aws.amazon.com/es_es/wellarchitected/latest/security-pillar/data-protection.html)
 
 # Sistema de puntuación
 
@@ -553,36 +570,63 @@ Solución:
 La evaluación del Reto 2 se realizará de acuerdo con el siguiente sistema de puntuación:
 
 
-## Componentes Básicos (80 puntos) 
-- Template CloudFormation completo y funcional (50 puntos) 
-- Estructura correcta del template (formato, secciones): 5 puntos 
-- Recursos de almacenamiento (S3, DynamoDB): 10 puntos 
-- Recursos de comunicación (SNS, EventBridge): 10 puntos 
-- Recursos de red (VPC, Subnets, Security Groups): 10 puntos 
-- Recursos de cómputo (EC2, Lambda): 10 puntos 
-- Roles y políticas IAM correctamente definidos: 5 puntos
+## Creación del Template CloudFormation (70 puntos) 
+Cada uno de los siguientes recursos vale 5 puntos cuando está correctamente definido: 
+- AWS::S3::Bucket - HotelReservationsBucket (S3 Bucket) 
+- AWS::S3::BucketPolicy - HotelReservationsBucketPolicy (Política del bucket) 
+- AWS::DynamoDB::Table - HotelReservationsTable (Tabla DynamoDB) 
+- AWS::SNS::Topic - ReservationConflictsTopic (Tema SNS) 
+- AWS::SNS::Subscription - AdminSubscription (Suscripción SNS) 
+- AWS::IAM::Role - LambdaExecutionRole (Rol IAM para Lambda) 
+- AWS::EC2::SecurityGroup - LambdaSecurityGroup (Grupo de seguridad para Lambda) 
+- AWS::Lambda::Function - ReservationValidatorFunction (Función Lambda) 
+- AWS::Events::Rule - DynamoDBEventRule (Regla EventBridge) 
+- AWS::Lambda::Permission - LambdaPermissionForEventBridge (Permiso Lambda) 
+- AWS::IAM::Role - EC2InstanceRole (Rol IAM para EC2) 
+- AWS::IAM::InstanceProfile - EC2InstanceProfile (Perfil de instancia) 
+- AWS::EC2::SecurityGroup - WebServerSecurityGroup (Grupo de seguridad para EC2) 
+- AWS::EC2::Instance - WebServerInstance (Instancia EC2 con UserData)
+
+## Funcionamiento de la aplicación (20 puntos)
+
+- Despliegue exitoso (Stack creado correctamente sin errores) - 5 puntos
+- Aplicación web accesible - 5 puntos
+- Aplicación funcional (crear y visualizar reservas) - 5 puntos
+- Detección de conflictos (notificación por correo) - 5 puntos
+
+## Tareas opcionales - Seguridad (10 puntos)
+- Implementación de encriptación en S3 - 5 puntos
+- Implementación de encriptación en DynamoDB - 5 puntos
+
+## Registro de avance en Planner
+Para registrar tu avance, deberás subir:
+
+1. Archivo YAML completo - Sube tu template CloudFormation finalizado 
+Tarea: "Template CloudFormation desarrollado" 
+Adjunta: 
+- Archivo .yaml completo
+- Pantallazo de la validación exitosa del template en la consola de CloudFormation
+
+2. Evidencia de despliegue - Confirma que la creación del stack fue exitosa 
+Tarea: "Despliegue CloudFormation exitoso" 
+Adjunta: 
+- Captura de pantalla del stack con estado CREATE_COMPLETE
+- Captura de pantalla de la sección Outputs del stack
 
 
-## Despliegue y funcionamiento (30 puntos) 
-- Despliegue exitoso del stack completo: 10 puntos 
-- Aplicación web accesible y funcional: 10 puntos 
-- Sistema de validación y notificación de conflictos operando correctamente: 10 puntos
+3. Evidencia de funcionamiento - Demuestra que la aplicación está operativa 
+Tarea: "Sistema funcionando correctamente" 
+Adjunta: 
+- Captura de pantalla de la página principal de la aplicación web funcionando
+- Captura de pantalla de una reserva creada exitosamente
+- Captura de pantalla del correo electrónico de notificación de conflicto recibido
 
 
-## Tareas Adicionales (20 puntos) 
-- Implementar Parámetros y Mapeos: 4 puntos 
-- Mejorar la seguridad con Nested Stacks: 4 puntos 
-- Implementar una infraestructura Multi-AZ: 4 puntos 
-- Integración con AWS Secrets Manager: 4 puntos 
-- Implementar Drift Detection y Stack Policies: 4 puntos
-
-
-## Registro de avance en Planner 
-Para registrar tu avance y enviar evidencias: 
-1. Accede al Planner del equipo en MS Teams (Grupo Semillero AWS Ciber) 
-2. Marca cada tarea como completada conforme avances 
-3. Adjunta capturas de pantalla como evidencia para cada componente 
-4. Cuando hayas finalizado todo el reto, marca la tarea "Reto 2 Completado"
+4. Seguridad adicional (opcional) 
+Tarea: "Implementación de encriptación en reposo" 
+Adjunta: 
+- Sección del template donde se configura la encriptación
+- Breve explicación de la implementación (máximo 1 página)
 
 
 Recuerda que los 5 participantes con mayor puntuación al final del reto obtendrán un reconocimiento. 
