@@ -1,6 +1,5 @@
 # Reto 2: Despliegue de recursos a través de CloudFormation
 
-
 ## 1. Contexto y objetivo
 
 
