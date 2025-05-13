@@ -28,7 +28,7 @@ Se desea desarrollar un sistema de reservas que permita crear, modificar, elimin
 
 
 El sistema constará de los siguientes componentes de AWS:
-![Arquitectura de la solución](diagrama-arquitectura-reto1-semillero.jpg)
+![Arquitectura de la solución](diagrama-arquitectura-reto2-semillero.jpg)
 
 - **VPC (Virtual Private Cloud)**  
  La VPC es un recurso de red y permite controlar la conectividad y la seguridad. Se tendrá una Subnet privada donde estarán los recursos sensibles y una Subnet pública que se podrá alcanzar desde Internet.
@@ -208,7 +208,7 @@ Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFo
 
     # Clonar el repositorio con la aplicación 
     cd /opt/hotel-app 
-    git clone https://github.com/danielr9911/semillero-aws-ciber-reto1.git . 
+    git clone https://github.com/danielr9911/semillero-aws-ciber-reto2.git . 
 
     # Instalar dependencias de Python 
     pip3 install -r requirements.txt 
