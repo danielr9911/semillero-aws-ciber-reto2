@@ -1,5 +1,6 @@
 # Reto 2: Despliegue de recursos a través de CloudFormation
 
+
 ## 1. Contexto y objetivo
 
 
@@ -140,273 +141,108 @@ A continuación, deberás definir los recursos necesarios para la arquitectura. 
 
 ### 2.1 Bucket S3
 
-```yaml
-# S3 Bucket para archivos estáticos y documentos 
-HotelReservationsBucket: 
-  Type: 'AWS::S3::Bucket' 
-  Properties: 
-    BucketName: !Sub "semillero-${UserName}-hotel-reservations" 
-    # Aquí definir las demás propiedades del Bucket S3 
-```
-
 Documentación: [AWS::S3::Bucket](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html)
 
 ### 2.2 Política de Bucket S3
-
-```yaml
-# Política de bucket para hacer públicos los archivos estáticos 
-HotelReservationsBucketPolicy: 
-  Type: 'AWS::S3::BucketPolicy' 
-  Properties: 
-    Bucket: !Ref HotelReservationsBucket 
-    # Aquí definir las demás propiedades 
-```
 
 Documentación: [AWS::S3::BucketPolicy](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-policy.html)
 
 ### 2.3 Tabla DynamoDB
 
-```yaml
-# Tabla DynamoDB para almacenar reservas 
-HotelReservationsTable: 
-  Type: 'AWS::DynamoDB::Table' 
-  Properties: 
-    TableName: !Sub "semillero-${UserName}-HotelReservations" 
-    # Aquí definir las demás propiedades 
-```
-
 Documentación: [AWS::DynamoDB::Table](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html)
 
 ### 2.4 Tema SNS
-
-```yaml
-# Tema SNS para notificaciones de conflictos 
-ReservationConflictsTopic: 
-  Type: 'AWS::SNS::Topic' 
-  Properties: 
-    TopicName:  !Sub "semillero-${UserName}-HotelReservationsConflicts" 
-    DisplayName: 'Conflictos de Reservas de Hotel' 
-```
 
 Documentación: [AWS::SNS::Topic](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-topic.html)
 
 ### 2.5 Suscripción SNS
 
-```yaml
-# Suscripción al tema SNS para el administrador 
-AdminSubscription: 
-  Type: 'AWS::SNS::Subscription' 
-  Properties: 
-    TopicArn: !Ref ReservationConflictsTopic 
-    Protocol: email 
-    Endpoint: !Sub "${UserName}@bancolombia.com.co" 
-```
-
 Documentación: [AWS::SNS::Subscription](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html)
 
 ### 2.6 Rol de ejecución para Lambda
-
-```yaml
-# Rol IAM para la función Lambda 
-LambdaExecutionRole: 
-  Type: 'AWS::IAM::Role' 
-  Properties: 
-    AssumeRolePolicyDocument: 
-      # Aquí va la política de confianza para Lambda 
-    ManagedPolicyArns: 
-      # Aquí van las políticas administradas necesarias 
-    Policies: 
-      # Aquí van las políticas inline necesarias para el rol 
-```
 
 Documentación: [AWS::IAM::Role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html)
 
 ### 2.7 Grupo de seguridad para Lambda
 
-```yaml
-# Grupo de seguridad para Lambda 
-LambdaSecurityGroup: 
-  Type: AWS::EC2::SecurityGroup 
-  Properties: 
-    VpcId: !Ref VpcId 
-    # Aquí definir las demás propiedades 
-```
-
 Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html)
 
 ### 2.8 Función Lambda
 
-```yaml
-# Función Lambda para validar reservas 
-ReservationValidatorFunction: 
-  Type: 'AWS::Lambda::Function' 
-  Properties: 
-    FunctionName: !Sub "semillero-${UserName}-HotelReservationValidator" 
-    # Aquí definir las demás propiedades 
-    Environment: 
-      Variables: 
-        SNS_TOPIC_ARN: !Ref ReservationConflictsTopic 
-        DYNAMODB_TABLE: !Ref HotelReservationsTable 
-    Code: 
-      ZipFile: | 
-        # Aquí va el código de la función Lambda 
-```
-> 💡 Pista importante: En la propiedad ZipFile debes colocar el código Python de la función Lambda (archivo lambda_function.py). Recuerda configurar correctamente el handler para evitar errores de importación.
+> 💡 Pista importante: En la propiedad Code: ZipFile: debes colocar el código Python de la función Lambda (archivo lambda_function.py). Recuerda configurar correctamente el handler para evitar errores de importación.
 
 Documentación: [AWS::Lambda::Function](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html)
 
 ### 2.9 Regla de EventBridge
 
-```yaml
-# Regla de EventBridge para detectar cambios en DynamoDB 
-DynamoDBEventRule: 
-  Type: 'AWS::Events::Rule' 
-  Properties: 
-    Name: !Sub "semillero-${UserName}-HotelReservationsDynamoDBEvents" 
-    # Aquí definir las demás propiedades 
-```
-
 Documentación: [AWS::Events::Rule](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-events-rule.html)
 
 ### 2.10 Permiso para EventBridge
-
-```yaml
-# Permiso para que EventBridge invoque la función Lambda 
-LambdaPermissionForEventBridge: 
-  Type: 'AWS::Lambda::Permission' 
-  Properties: 
-    # Aquí definir las demás propiedades 
-```
 
 Documentación: [AWS::Lambda::Permission](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html)
 
 ### 2.11 Rol para instancia EC2
 
-```yaml
-# Rol para instancia EC2 
-EC2InstanceRole: 
-  Type: 'AWS::IAM::Role' 
-  Properties: 
-    AssumeRolePolicyDocument: 
-      # Aquí va la política de confianza para EC2 
-    ManagedPolicyArns: 
-      # Aquí van las políticas administradas necesarias 
-```
-
 Documentación: [AWS::IAM::Role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html)
 
 ### 2.12 Perfil de instancia para EC2
-
-```yaml
-# Perfil de instancia para EC2 
-EC2InstanceProfile: 
-  Type: 'AWS::IAM::InstanceProfile' 
-  Properties: 
-    Roles: 
-      - !Ref EC2InstanceRole 
-```
 
 Documentación: [AWS::IAM::InstanceProfile](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html)
 
 ### 2.13 Grupo de seguridad para EC2
 
-```yaml
-# Grupo de seguridad para EC2 
-WebServerSecurityGroup: 
-  Type: 'AWS::EC2::SecurityGroup' 
-  Properties: 
-    VpcId: !Ref VpcId 
-    # Aquí definir las demás propiedades 
-```
-
 Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html)
 
 ### 2.14 Instancia EC2
 
-```yaml
-# Instancia EC2 para el servidor web 
-WebServerInstance: 
-  Type: 'AWS::EC2::Instance' 
-  Properties: 
-    InstanceType: "t2.micro" 
-    ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}' 
-    SubnetId: !Ref PublicSubnetId 
-    SecurityGroupIds: 
-      - !Ref WebServerSecurityGroup 
-    IamInstanceProfile: !Ref EC2InstanceProfile 
-    Tags: 
-      - Key: Name 
-        Value: !Sub "semillero-${UserName}-web-server" 
-    UserData: 
-      Fn::Base64: !Sub | 
-        #!/bin/bash  
-        # Actualizar el sistema e instalar dependencias 
-        yum update -y 
-        yum install -y python3 python3-pip git 
- 
-        # Crear directorio para la aplicación 
-        mkdir -p /opt/hotel-app 
- 
-        # Clonar el repositorio con la aplicación 
-        cd /opt/hotel-app 
-        git clone https://github.com/danielr9911/semillero-aws-ciber-reto1.git . 
- 
-        # Instalar dependencias de Python 
-        pip3 install -r requirements.txt 
- 
-        # Crear directorios necesarios para el almacenamiento local 
-        mkdir -p local_storage/documents 
- 
-        # Modificar app.py para usar los recursos creados por CloudFormation 
-        sed -i "s/S3_BUCKET_NAME = 'semillero-\[USUARIO\]-hotel-reservations'/S3_BUCKET_NAME = 'semillero-${UserName}-hotel-reservations'/" app.py 
-        sed -i "s/DYNAMODB_TABLE = 'semillero-\[USUARIO\]-HotelReservations'/DYNAMODB_TABLE = 'semillero-${UserName}-HotelReservations'/" app.py 
- 
-        # Crear un archivo de servicio systemd 
-        cat > /etc/systemd/system/hotel-app.service << 'EOF' 
-        [Unit] 
-        Description=Hotel Reservation Application 
-        After=network.target 
- 
-        [Service] 
-        User=root 
-        WorkingDirectory=/opt/hotel-app 
-        ExecStart=/usr/bin/python3 app.py 
-        Restart=always 
- 
-        [Install] 
-        WantedBy=multi-user.target 
-        EOF 
- 
-        # Habilitar e iniciar el servicio 
-        systemctl daemon-reload 
-        systemctl enable hotel-app 
-        systemctl start hotel-app 
+> 💡 Pista importante: En la propiedad UserData: Fn::Base64: !Sub | debes colocar las líneas de bash indicadas a continuación. Estos comandos se ejecutarán automáticamente al iniciar la instancia y están diseñados para que suban de manera autonoma la aplicación.
+
+```bash
+    #!/bin/bash  
+    # Actualizar el sistema e instalar dependencias 
+    yum update -y 
+    yum install -y python3 python3-pip git 
+
+    # Crear directorio para la aplicación 
+    mkdir -p /opt/hotel-app 
+
+    # Clonar el repositorio con la aplicación 
+    cd /opt/hotel-app 
+    git clone https://github.com/danielr9911/semillero-aws-ciber-reto1.git . 
+
+    # Instalar dependencias de Python 
+    pip3 install -r requirements.txt 
+
+    # Crear directorios necesarios para el almacenamiento local 
+    mkdir -p local_storage/documents 
+
+    # Modificar app.py para usar los recursos creados por CloudFormation 
+    sed -i "s/S3_BUCKET_NAME = 'semillero-\[USUARIO\]-hotel-reservations'/S3_BUCKET_NAME = 'semillero-${UserName}-hotel-reservations'/" app.py 
+    sed -i "s/DYNAMODB_TABLE = 'semillero-\[USUARIO\]-HotelReservations'/DYNAMODB_TABLE = 'semillero-${UserName}-HotelReservations'/" app.py 
+
+    # Crear un archivo de servicio systemd 
+    cat > /etc/systemd/system/hotel-app.service << 'EOF' 
+    [Unit] 
+    Description=Hotel Reservation Application 
+    After=network.target 
+
+    [Service] 
+    User=root 
+    WorkingDirectory=/opt/hotel-app 
+    ExecStart=/usr/bin/python3 app.py 
+    Restart=always 
+
+    [Install] 
+    WantedBy=multi-user.target 
+    EOF 
+
+    # Habilitar e iniciar el servicio 
+    systemctl daemon-reload 
+    systemctl enable hotel-app 
+    systemctl start hotel-app 
 ```
 
 Documentación: [AWS::EC2::Instance](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html)
-
-### 2.15 Outputs
-
-Define las salidas para tener acceso a la información importante de tu stack:
-
-```yaml
-Outputs:  
-  ApplicationURL: 
-    Description: 'URL para acceder a la aplicación web' 
-    Value: !Sub 'http://${WebServerInstance.PublicIp}:5000' 
-   
-  WebServerPublicIP: 
-    Description: 'IP pública del servidor web' 
-    Value: !GetAtt WebServerInstance.PublicIp 
-     
-  DynamoDBTableName: 
-    Description: 'Nombre de la tabla DynamoDB' 
-    Value: !Ref HotelReservationsTable 
-     
-  S3BucketName: 
-    Description: 'Nombre del bucket S3' 
-    Value: !Ref HotelReservationsBucket 
-```
 
 ## Paso 3: Despliegue del template CloudFormation
 
@@ -571,20 +407,20 @@ La evaluación del Reto 2 se realizará de acuerdo con el siguiente sistema de p
 
 ## Creación del Template CloudFormation (70 puntos) 
 Cada uno de los siguientes recursos vale 5 puntos cuando está correctamente definido: 
-- AWS::S3::Bucket - HotelReservationsBucket (S3 Bucket) 
-- AWS::S3::BucketPolicy - HotelReservationsBucketPolicy (Política del bucket) 
-- AWS::DynamoDB::Table - HotelReservationsTable (Tabla DynamoDB) 
-- AWS::SNS::Topic - ReservationConflictsTopic (Tema SNS) 
-- AWS::SNS::Subscription - AdminSubscription (Suscripción SNS) 
-- AWS::IAM::Role - LambdaExecutionRole (Rol IAM para Lambda) 
-- AWS::EC2::SecurityGroup - LambdaSecurityGroup (Grupo de seguridad para Lambda) 
-- AWS::Lambda::Function - ReservationValidatorFunction (Función Lambda) 
-- AWS::Events::Rule - DynamoDBEventRule (Regla EventBridge) 
-- AWS::Lambda::Permission - LambdaPermissionForEventBridge (Permiso Lambda) 
-- AWS::IAM::Role - EC2InstanceRole (Rol IAM para EC2) 
-- AWS::IAM::InstanceProfile - EC2InstanceProfile (Perfil de instancia) 
-- AWS::EC2::SecurityGroup - WebServerSecurityGroup (Grupo de seguridad para EC2) 
-- AWS::EC2::Instance - WebServerInstance (Instancia EC2 con UserData)
+- AWS::S3::Bucket (S3 Bucket) 
+- AWS::S3::BucketPolicy (Política del bucket) 
+- AWS::DynamoDB::Table (Tabla DynamoDB) 
+- AWS::SNS::Topic (Tema SNS) 
+- AWS::SNS::Subscription (Suscripción SNS) 
+- AWS::IAM::Role (Rol IAM para Lambda) 
+- AWS::EC2::SecurityGroup (Grupo de seguridad para Lambda) 
+- AWS::Lambda::Function (Función Lambda) 
+- AWS::Events::Rule (Regla EventBridge) 
+- AWS::Lambda::Permission (Permiso Lambda) 
+- AWS::IAM::Role (Rol IAM para EC2) 
+- AWS::IAM::InstanceProfile (Perfil de instancia) 
+- AWS::EC2::SecurityGroup (Grupo de seguridad para EC2) 
+- AWS::EC2::Instance (Instancia EC2 con UserData)
 
 ## Funcionamiento de la aplicación (20 puntos)
 
