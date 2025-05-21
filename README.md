@@ -139,6 +139,10 @@ Parameters:
 
 A continuación, deberás definir los recursos necesarios para la arquitectura. Para cada recurso te proporcionamos el nombre lógico (Logical ID) y el tipo de recurso que debes usar, pero tendrás que investigar las propiedades necesarias.
 
+
+### Nota importante sobre la actualización del template
+> ⚠️ ACTUALIZACIÓN IMPORTANTE: Se ha modificado el mecanismo de integración entre DynamoDB y Lambda. Originalmente, se utilizaba EventBridge con eventos de CloudTrail, pero debido a problemas con la activación de Data Events en CloudTrail, ahora utilizamos DynamoDB Streams para una integración más directa y eficiente. Si ya has desplegado la versión anterior, por favor elimina tu stack y despliega esta nueva versión.
+
 ### 2.1 Bucket S3
 
 Documentación: [AWS::S3::Bucket](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html)
@@ -173,27 +177,23 @@ Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFo
 
 Documentación: [AWS::Lambda::Function](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html)
 
-### 2.9 Regla de EventBridge
+### 2.9 Event Source Mapping para DynamoDB Streams
 
-Documentación: [AWS::Events::Rule](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-events-rule.html)
+Documentación: [AWS::Lambda::EventSourceMapping](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html)
 
-### 2.10 Permiso para EventBridge
-
-Documentación: [AWS::Lambda::Permission](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html)
-
-### 2.11 Rol para instancia EC2
+### 2.10 Rol para instancia EC2
 
 Documentación: [AWS::IAM::Role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html)
 
-### 2.12 Perfil de instancia para EC2
+### 2.11 Perfil de instancia para EC2
 
 Documentación: [AWS::IAM::InstanceProfile](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html)
 
-### 2.13 Grupo de seguridad para EC2
+### 2.12 Grupo de seguridad para EC2
 
 Documentación: [AWS::EC2::SecurityGroup](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html)
 
-### 2.14 Instancia EC2
+### 2.13 Instancia EC2
 
 > 💡 Pista importante: En la propiedad UserData: Fn::Base64: !Sub | debes colocar las líneas de bash indicadas a continuación. Estos comandos se ejecutarán automáticamente al iniciar la instancia y están diseñados para que suban de manera autonoma la aplicación.
 
